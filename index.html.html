@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WJ On-Call Board</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #f7f7f5;
+  color: #1a1a18;
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 20px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.header { text-align: center; margin-bottom: 24px; }
+.header h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 4px; }
+.header .date { font-size: 0.8rem; color: #6b6b65; font-family: ui-monospace, monospace; }
+.sections { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 520px) { .sections { grid-template-columns: 1fr; } }
+.section { background: #fff; border: 1px solid #e2e2dc; border-radius: 12px; overflow: hidden; }
+.section-header {
+  padding: 12px 16px; font-size: 0.7rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  display: flex; align-items: center; gap: 8px;
+}
+.section-header .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pkg .section-header { background: #e8f1fa; color: #0f4a7a; }
+.pkg .section-header .dot { background: #1d6fb5; }
+.proc .section-header { background: #faf0e8; color: #7a3e0f; }
+.proc .section-header .dot { background: #b5621d; }
+.person { padding: 14px 16px; display: flex; align-items: center; gap: 12px; border-top: 1px solid #e2e2dc; }
+.person.active { background: #dcfce7; }
+.avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 0.8rem; flex-shrink: 0;
+}
+.pkg .avatar { background: #e8f1fa; color: #0f4a7a; }
+.proc .avatar { background: #faf0e8; color: #7a3e0f; }
+.person.active .avatar { box-shadow: 0 0 0 2px #22c55e; }
+.person-info { min-width: 0; }
+.person-name { font-size: 0.9rem; font-weight: 500; }
+.person-label {
+  font-size: 0.7rem; font-weight: 500; border-radius: 4px;
+  padding: 2px 8px; display: inline-block; margin-top: 2px;
+}
+.person.active .person-label { background: #dcfce7; color: #166534; border: 1px solid #22c55e; }
+.person:not(.active) .person-label { background: #f3f4f6; color: #6b7280; }
+.week-date { font-size: 0.7rem; color: #6b6b65; font-family: ui-monospace, monospace; margin-top: 2px; }
+.footer { text-align: center; margin-top: 20px; font-size: 0.75rem; color: #6b6b65; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>WJ Automation on-call</h1>
+  <div class="date" id="currentDate"></div>
+</div>
+<div class="sections">
+  <div class="section pkg" id="pkgSection">
+    <div class="section-header"><span class="dot"></span>Packaging</div>
+  </div>
+  <div class="section proc" id="procSection">
+    <div class="section-header"><span class="dot"></span>Processing</div>
+  </div>
+</div>
+<div class="footer">Rotation auto-updates weekly (Mon–Sun)</div>
+<script>
+(function() {
+  var anchorMonday = new Date(2026, 9, 5);
+  var packaging = [
+    { name: 'Chris Ramirez', initials: 'CR' },
+    { name: 'Bamba Salam', initials: 'BS' },
+    { name: 'Libny Lopez', initials: 'LL' }
+  ];
+  var processing = [
+    { name: 'Brice Albers', initials: 'BA' },
+    { name: 'Ryan Eggertsen', initials: 'RE' }
+  ];
+  function getMonday(d) {
+    var day = d.getDay();
+    var diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.getFullYear(), d.getMonth(), diff);
+  }
+  function weeksBetween(a, b) { return Math.round((b - a) / (7 * 24 * 60 * 60 * 1000)); }
+  function formatWeek(monday) {
+    var sun = new Date(monday); sun.setDate(sun.getDate() + 6);
+    return (monday.getMonth()+1) + '/' + monday.getDate() + ' – ' + (sun.getMonth()+1) + '/' + sun.getDate();
+  }
+  function mod(n, m) { return ((n % m) + m) % m; }
+  var now = new Date();
+  var thisMonday = getMonday(now);
+  var weeksOffset = weeksBetween(anchorMonday, thisMonday);
+  var pkgIdx = mod(weeksOffset, packaging.length);
+  var procIdx = mod(weeksOffset, processing.length);
+  document.getElementById('currentDate').textContent = 'Week of ' + formatWeek(thisMonday);
+  function renderSection(id, roster, idx, weeks) {
+    var el = document.getElementById(id);
+    for (var w = 0; w < weeks; w++) {
+      var i = mod(idx + w, roster.length);
+      var mon = new Date(thisMonday); mon.setDate(mon.getDate() + w * 7);
+      var p = roster[i], active = w === 0;
+      var div = document.createElement('div');
+      div.className = 'person' + (active ? ' active' : '');
+      div.innerHTML = '<div class="avatar">' + p.initials + '</div><div class="person-info"><div class="person-name">' + p.name + '</div><span class="person-label">' + (active ? 'On call now' : 'Upcoming') + '</span><div class="week-date">' + formatWeek(mon) + '</div></div>';
+      el.appendChild(div);
+    }
+  }
+  renderSection('pkgSection', packaging, pkgIdx, 1);
+  renderSection('procSection', processing, procIdx, 1);
+})();
+</script>
+</body>
+</html>
